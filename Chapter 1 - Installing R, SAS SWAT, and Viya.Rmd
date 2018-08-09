@@ -1,0 +1,74 @@
+---
+title: "Chapter 1 - Installing R, SAS SWAT, and Viya"
+author: ""
+date: ""
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+![](https://raw.githubusercontent.com/qi-yue/sas-viya-the-R-perspective/master/figures/2_1.png)
+
+
+## Install SAS SWAT
+
+To install SWAT, you use the standard R installation function install.packages(). The SWAT installers are located at GitHub in the r-swat project of the sassoftware account. The available releases are listed at the following link:
+
+[https://github.com/sassoftware/r-swat/releases](https://github.com/sassoftware/r-swat/releases)
+
+After downloading the package, you can install SWAT using a command similar to the following
+
+R CMD INSTALL r-swat-X.X.X-platform.tar.gz
+
+Where X.X.X is the version number, and platform is the platform that you are installing on. 
+
+You can also install SWAT package from URL directly using the following code in R.
+
+
+```{r eval = FALSE}
+# Make sure prerequisites are installed
+install.packages('httr')
+install.packages('jsonlite')
+install.packages('https://github.com/sassoftware/r-swat/releases/download/vX.X.X/r-swat-X.X.X-platform.tar.gz',repos=NULL, type='file') 
+
+```
+
+For example, you can use the following R code to install SWAT version 1.1.0 on your linux64 machine.
+```{r eval = FALSE}
+install.packages('https://github.com/sassoftware/R-swat/releases/download/1.1.0/r-swat-1.1.0-linux64.tar.gz.tgz', repos=NULL, type='file')
+
+```
+
+For WIN64 and OSX64, only REST interface is available. For example, you can use the following R code to install version 1.1.0 on WIN64 machine.
+```{r eval = FALSE}
+install.packages('https://github.com/sassoftware/R-swat/releases/download/1.1.0/r-swat-1.1.0-win64-REST-only.tar.gz', repos=NULL, type='file')
+
+```
+
+If your platform isn't available, you can install using the source code URL on the releases page instead, but you are restricted to using the REST interface over HTTP or HTTPS.
+```{r eval = FALSE}
+install.packages('https://github.com/sassoftware/r-swat/archive/vX.X.X.tar.gz', repos=NULL, type='file')
+
+```
+
+After SWAT is installed, you should be able to run the following command in R in order to load the SWAT package:
+```{r eval = FALSE}
+library("swat")
+```
+##Making Your First Connection
+
+With all of the pieces in place, we can make a test connection just to verify that everything is working. From R, you should be able to run the following commands:
+```{r eval = FALSE}
+library("swat")
+conn <- CAS('server-name.mycompany.com', port = port-number, 
+              Username = 'userid', password = 'password', 
+              protocol = "http")
+cas.builtins.serverStatus(conn)
+cas.session.endSession(conn)
+
+```
+
+Where server-name.mycompany.com is the name or IP address of your CAS server, port-number is the port number that CAS is listening to, userid is your CAS user ID, and password is your CAS password. The cas.builtins.serverStatus function should return information about the CAS grid that you are connected to, and the cas.builtins.serverStatus function closes the connection. If the commands run successfully, then you are ready to move on. If not, you'll have to do some troubleshooting before you continue.

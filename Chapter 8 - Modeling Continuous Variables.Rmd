@@ -1,0 +1,257 @@
+---
+title: "Chapter 8 - Modeling Continuous Variables"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+
+
+Import the SWAT package and get connected.
+
+```{r}
+library("swat")
+library(dplyr)
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+cas.sessionProp.setSessOpt(conn, caslib = 'casuser')
+```
+
+```{r}
+cars <- cas.read.csv(conn, file = 'https://raw.githubusercontent.com/sassoftware/sas-viya-programming/master/data/cars.csv')
+
+cas.table.tableInfo(conn,name = 'cars')
+
+```
+
+```{r}
+cas.table.columnInfo(cars)
+```
+# Linear Regression
+```{r}
+cas.builtins.loadActionSet(conn, 'regression')
+```
+
+```{r}
+cas.regression.glm(cars, target = 'MSRP', inputs = c('MPG_City'))
+```
+
+```{r}
+cas.regression.glm(cars, target = 'MSRP', inputs = c('MPG_City'),
+                   display = list(names = "ParameterEstimates"))
+
+```
+
+```{r}
+result1 <- cas.regression.glm(
+  cars, 
+  target = 'MSRP', 
+  inputs = c('MPG_City'),
+  display = list(names = 'OutputCasTables'),
+  output = list(casOut = list(name='MSRPPrediction', replace = TRUE), 
+                copyvars = 'all'))
+result1
+```
+
+```{r}
+cas.simple.summary(result1['Pred'])
+```
+
+```{r}
+cas.regression.glm(
+  cars, target = 'MSRP', inputs = c('MPG_City'),
+  display = list(names = 'OutputCasTables'),
+  output = list(casOut = list(name='MSRPPrediction2', replace = TRUE), 
+                copyvars = 'all',
+                pred  = 'Predicted_MSRP',
+                resid = 'Residual_MSRP',
+                lcl = 'LCL_MSRP',
+                ucl = 'UCL_MSRP'
+                ))
+
+```
+
+```{r}
+result2 <- defCasTable(conn, "MSRPPrediction2")
+```
+
+```{r}
+out1 <- cas.table.fetch(result2, to = 1000)$Fetch
+library(ggplot2)
+ggplot(out1, aes(Predicted_MSRP, Residual_MSRP, 
+                 colour = Origin, shape = Origin)) +
+geom_point()
+
+```
+
+```{r}
+result2[result2$Predicted_MSRP<0,   
+        c('Predicted_MSRP','MSRP','MPG_City','Make','Model')]
+
+```
+
+```{r}
+ggplot(out1, aes(MPG_City, MSRP, 
+                 colour = Origin, shape = Origin)) +
+  geom_point()
+
+```
+
+```{r}
+cars@where <- 'MSRP < 100000 and MPG_City < 40'
+cas.regression.glm(
+  cars, target = 'MSRP', inputs = c('MPG_City'),
+  display = list(names = 'FitStatistics'),
+  output = list(casOut = list(name='MSRPPrediction2', replace = TRUE), 
+                copyvars = 'all',
+                pred  = 'Predicted_MSRP',
+                resid = 'Residual_MSRP',
+                lcl = 'LCL_MSRP',
+                ucl = 'UCL_MSRP'
+  ))
+
+```
+
+```{r}
+result2 <- defCasTable(conn, 'MSRPPrediction2')
+out2 <- cas.table.fetch(result2, to = 1000)$Fetch
+ggplot(out2, aes(Predicted_MSRP, Residual_MSRP, 
+                 colour = Origin, shape = Origin)) +
+  geom_point()
+
+```
+
+```{r}
+nomList <- c('Origin','Type','DriveTrain')
+contList <- c('MPG_City','Weight','Length')
+cas.regression.glm(
+  cars, target = 'MSRP', inputs = c(nomList,contList), nominals = nomList,
+  display = list(names = 'FitStatistics'),
+  output = list(casOut = list(name='MSRPPrediction2', replace = TRUE), 
+                copyvars = 'all',
+                pred  = 'Predicted_MSRP',
+                resid = 'Residual_MSRP',
+                lcl = 'LCL_MSRP',
+                ucl = 'UCL_MSRP'
+  ))
+
+```
+
+```{r}
+cars@where <- ''
+cars@groupby <- 'Origin'
+out <- cas.simple.summary(cars,inputs=c('MSRP'))
+result <- rbind.bygroups(out)
+result$Summary[,c('Origin','Column','Mean','Var','Std')]
+
+```
+
+```{r}
+cars@groupby <- 'Origin'
+cars@where <- 'MSRP < 100000 and MPG_City < 40'
+nomList <- c('Type','DriveTrain')
+contList <- c('MPG_City','Weight','Length')
+tmp <- cas.regression.glm(
+  cars, target = 'MSRP', inputs = c(nomList,contList), nominals = nomList,
+  display = list(names = "FitStatistics"),
+  output = list(casOut = list(name='MSRPPredictionGroupBy', replace = TRUE), 
+                copyvars = 'all',
+                pred  = 'Predicted_MSRP',
+                resid = 'Residual_MSRP',
+                lcl = 'LCL_MSRP',
+                ucl = 'UCL_MSRP'
+  ))
+groupBYResult <- defCasTable(conn, 'MSRPPredictionGroupBy')
+out <- cas.table.fetch(groupBYResult, to = 1000)$Fetch
+ggplot(out, aes(Predicted_MSRP, Residual_MSRP, 
+                 colour = Origin, shape = Origin)) +
+  geom_point()
+
+```
+# Extensions of Ordinary Linear Regression
+## Generalized Linear Models
+```{r}
+cars@groupby <- list()
+cars@where <- ''
+cas.regression.genmod(
+  cars,
+  model = list(depVars = list(name = 'MSRP'),
+               effects = c('MPG_City'),
+               dist    = 'gamma',
+               link    = 'log'
+               )
+  )
+
+```
+
+```{r}
+cas.regression.genmod(
+  cars,
+  model = list(depVars = list(name = 'Cylinders'),
+               effects = c('MPG_City'),
+               dist    = 'multinomial',
+               link    = 'logit'),
+  display = list(names = list('ModelInfo', 'ParameterEstimates'))
+)
+
+```
+
+```{r}
+out <- cas.regression.genmod(
+  cars,
+  model = list(depVars = list(name = 'Cylinders'),
+               effects = c('MPG_City'),
+               dist    = 'multinomial',
+               link    = 'logit'),
+  output= list(casout  = list(name = 'CylinderPredicted',
+                              replace = TRUE),
+               copyVars= 'ALL',
+               pred = 'Prob_Cylinders')
+)
+
+```
+
+```{r}
+result <- defCasTable(conn, 'CylinderPredicted')
+head(result[[c('Prob_Cylinders','_LEVEL_','Cylinders','MPG_City')]], n = 24)
+
+```
+## Regression Trees
+```{r}
+loadActionSet(conn, 'decisionTree')
+```
+
+```{r}
+result <- cas.decisionTree.dtreeTrain(
+  cars,
+  target = 'MSRP',
+  inputs = c('MPG_City'),
+  maxlevel = 2,
+  casout = list(name = 'treeModel1', replace = TRUE)
+)
+output1 <- defCasTable(conn, 'treeModel1')
+output1[,c('_NodeID_', '_Parent_','_Mean_','_NodeName_',
+           '_PBLower0_','_PBUpper0_')]
+
+```
+
+```{r eval = FALSE}
+cas.decisiontree.dtreePrune(
+  conn, 
+  table = 'your_vadliatoin_data',
+  modelTable = 'treeModel1',
+  casout = list(name = 'pruned_tree')
+  )
+
+```
+
+```{r eval = FALSE}
+cas.decisiontree.dtreeScore(
+  conn,
+  table = 'your_vadliatoin_data',
+  modelTable = 'pruned_tree'
+  )
+
+```

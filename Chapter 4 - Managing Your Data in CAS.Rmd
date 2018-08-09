@@ -1,0 +1,276 @@
+---
+title: "Chapter 4 - Managing Your Data in CAS"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+## Getting Started with Caslibs and CAS Tables
+
+Import the SWAT package.
+
+
+```{r}
+library("swat")
+
+```
+
+Create a connection.
+```{r}
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+
+```
+
+
+Find out what caslibs are available using the caslibinfo action.
+
+```{r}
+cas.table.caslibInfo(conn)
+```
+
+List the items at a path relative to the given CASLib using the table.fileInfo action.
+```{r}
+cas.table.fileInfo(conn, caslib = 'casuser', path = 'data')
+```
+
+Use the fileinfo action with the active CASLib (i.e., casuser).
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = "casuser")
+cas.table.fileInfo(conn, path = 'data')
+```
+
+In addition to the files that are accessible to this caslib, there can also be tables that have already been loaded that are available to the caslib. These can be seen using the table.tableInfo action.
+
+```{r}
+out <- cas.table.tableInfo(conn)
+```
+## Loading Data into a CAS Table
+
+Load data from the server-side using the table.loadTable action.
+
+```{r}
+out <- cas.table.loadTable(
+  conn, 
+  path = 'data/iris.csv', 
+  caslib='casuser'
+)
+out
+```
+
+
+Specify an output table name explicitly.
+
+```{r}
+out <- cas.table.loadTable(
+  conn, 
+  path = 'data/iris.csv', 
+  caslib='casuser', 
+  casout=list(name='mydata', caslib='casuser')
+  )
+out
+```
+
+Get information about the table using the table.tableInfo action.
+
+```{r}
+cas.table.tableInfo(conn, name = 'data.iris', caslib = 'casuser')
+```
+
+Get information about the table columns using columninfo.
+
+```{r}
+cas.table.columnInfo(
+  conn, 
+  table = list(name = 'data.iris', caslib = 'casuser')
+)
+
+```
+
+### Displaying Data in a CAS Table
+
+Use the table.fetch action to download rows of data.
+
+```{r}
+cas.table.fetch(
+  conn, 
+  table = list(name = 'data.iris', caslib = 'casuser'), 
+  to = 5
+)
+
+```
+
+Specify sorting options to get a predictable set of data.
+
+```{r}
+cas.table.fetch(
+  conn, 
+  table = list(name = 'data.iris', caslib = 'casuser'), 
+  to = 5,
+  sortby=list('Sepal.Length ', 'Sepal.Width')
+)
+
+```
+
+### Computing Simple Statistics
+Run the simple.summary action on the table.
+
+```{r}
+cas.simple.summary(
+  conn, 
+  table = list(name='data.iris', caslib='casuser')
+)
+
+```
+
+### Dropping a CAS Table
+
+```{r}
+cas.table.dropTable(
+  conn, 
+  name = 'data.iris', 
+  caslib = 'casuser'
+)
+
+```
+
+### The Active Caslib
+Use the caslibinfo action to display information about CASLibs. The Active column indicates whether the CASLib is the active CASLib.
+
+```{r}
+cas.table.caslibInfo(conn)
+```
+
+You can get the active CASLib setting using the getsessopt action.
+
+```{r}
+cas.sessionProp.getSessOpt(conn, name = 'caslib')
+```
+
+You can set the active CASLib using the setsessopt action.
+
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = 'formats')
+```
+
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = 'casuser')
+```
+
+
+## Uploading Data Files to CAS Tables
+Use the cas.read.csv function on CAS connection objects to upload CSV data from client-side files. This uploads the file to the server as-is. It is then parsed on the server.
+
+```{r}
+iris1 <- cas.read.csv(conn,'/u/sasyqi/data/iris.csv')
+```
+
+
+```{r}
+cas.table.columnInfo(iris1)
+```
+
+Specify an explicit table name on cas.read.csv
+
+```{r}
+iris2 <- cas.read.csv(
+  conn, 
+  '/u/sasyqi/data/iris.csv',
+  casOut = list(name = 'iris2', caslib='casuser')
+)
+
+```
+
+Use the sep SEP parameter to parse a tab-delimited file.
+```{r}
+iris_tsv <- cas.read.csv(
+  conn, 
+  '/u/sasyqi/data/iris.tsv',
+  sep = '\t', 
+  casOut = list(name = "iris_tsv", caslib='casuser')
+)
+head(iris_tsv)
+
+```
+
+## Uploading Data from URLs to CAS Tables
+
+Rather than specifying a filename, you can specify a URL.
+
+```{r}
+out <- cas.read.csv(conn, 'https://raw.githubusercontent.com/sassoftware/sas-viya-programming/master/data/class.csv')
+
+head(out)
+
+```
+
+## Uploading Data from a data.frame to a CAS Table
+
+In addition to files, you can upload data.frame.
+```{r}
+head(iris)
+class(iris)
+```
+
+Upload iris data.frame to a CASTable with the name "iris"
+```{r}
+iris_ct <- as.casTable(conn, iris, casOut = list(replace = TRUE))
+cas.table.fetch(conn,table = 'iris', to = 5)
+```
+
+Give the table a different name using the casOut parameter.
+```{r}
+iris_tbl <- as.casTable(conn, iris, casOut = list(name = 'iris_cas',replace = TRUE))
+
+```
+
+## Exporting CAS Tables to Other Formats
+
+Store the data from a CAS table to CSV form 
+```{r}
+cas.table.save(iris_tbl, name='data/irisout.csv', caslib='casuser', replace = TRUE)
+
+```
+
+Store the data from a CAS table to SASHDAT form 
+```{r}
+cas.table.save(iris_tbl, name='data/irisout.sashdat', caslib='casuser', replace = TRUE)
+
+```
+
+## Managing Caslibs
+### Creating a Caslib
+```{r}
+cas.table.addCaslib(
+  conn,
+  path='/research/data ', 
+  caslib='research', 
+  description='Research Data',  
+  subDirs=FALSE,
+  session=FALSE,
+  activeOnAdd=FALSE
+  )
+
+
+```
+
+### Setting an Active Caslib
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = 'research')
+
+```
+
+```{r}
+cas.table.caslibInfo(conn, caslib='research')
+
+```
+
+### Dropping a Caslib
+```{r}
+cas.table.dropCaslib(conn, caslib = 'research')
+
+```
+
+

@@ -1,0 +1,94 @@
+---
+title: "Chapter 2 - The Ten-Minute Guide to Using CAS from R"
+author: "Yue Qi"
+date: "May 31, 2018"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+## Loading SWAT and Getting Connected
+
+Import the SWAT package.
+
+
+```{r}
+library("swat")
+
+```
+
+Create a connection.
+```{r}
+conn <- CAS('rdcgrdc.unx.sas.com', 22009)
+```
+
+Run the help action.
+
+```{r}
+out <- cas.builtins.help(conn)
+```
+
+```{r results = 'markup'}
+names(out)
+```
+
+```{r}
+out
+```
+
+```{r}
+out$builtins
+```
+
+## Running CAS Actions
+For example, the userInfo action is called as follows.
+
+```{r}
+cas.builtins.userInfo(conn)
+```
+
+
+## Loading Data
+We use the classic Iris data set in the following data loading example.
+```{r}
+iris_ct <- as.casTable(conn,iris,casOut = list(replace = TRUE))
+attributes(iris_ct)
+
+```
+We can use actions such as tableInfo and columnInfo in the table action set to access general information about the table itself and its columns.
+```{r}
+# Call the tableInfo action on the CASTable object.
+cas.table.tableInfo(conn)
+
+```
+## Executing Actions on CAS Tables
+Let's run the summary action in simple action set on our CAS table.
+```{r}
+summ <- cas.simple.summary(iris_ct)
+summ
+
+```
+
+If you want them in a form similar to what R users are used to, you can use the summary() method (just like on R data.frame objects). 
+```{r}
+# Waiting for bug fixing
+summary(iris_ct)
+```
+## Data Visualization
+The following example uses the plot method to download the data set and plot it using the default options. To prevent downloading very large data set to the client, only 10,000 rows is randomly sampled and downloaded if the data set has more than 10,000 rows.
+```{r EVAL = FALSE}
+plot(iris_ct$Sepal.Length, iris_ct$Sepal.Width)
+
+
+```
+![](https://github.com/qi-yue/sas-viya-the-R-perspective/blob/master/figures/2_1.png?raw=true)
+
+
+## Closing the Connection
+As with any network or file resource in R, you should close your CAS connections when you are finished. 
+```{r}
+cas.session.endSession(conn)
+```
+

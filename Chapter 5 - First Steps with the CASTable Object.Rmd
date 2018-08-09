@@ -1,0 +1,240 @@
+---
+title: "Chapter 5 - First Steps with the CASTable Object"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+Import the SWAT package and get connected.
+
+```{r}
+library("swat")
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+
+```
+
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = "casuser")
+out <- cas.table.loadTable(conn, path='data/iris.csv', caslib='casuser')
+out
+```
+
+```{r}
+out$caslib
+out[['tableName']]
+out['tableName']
+```
+
+Create the CASTable object manually
+
+```{r}
+newtbl <- defCasTable(conn, 'data.iris')
+
+```
+
+Verify the result
+```{r}
+head(newtbl)
+
+```
+
+```{r}
+cas.table.columnInfo(conn, table = 'data.iris')
+
+```
+
+```{r}
+cas.table.fetch(conn, table = 'data.iris', to = 5)
+
+```
+
+```{r}
+cas.table.columnInfo(newtbl)
+
+```
+
+```{r}
+cas.table.fetch(newtbl, to = 5)
+
+```
+
+```{r}
+cas.simple.summary(newtbl)
+
+```
+
+```{r}
+cas.simple.correlation(newtbl)
+
+```
+
+```{r}
+names(newtbl)
+
+```
+
+```{r}
+summary(newtbl)
+```
+
+# Setting CASTable Parameters
+```{r}
+attributes(newtbl)
+```
+
+```{r}
+iristbl <- defCasTable(
+  conn, 'data.iris', 
+  caslib = 'casuser',
+  where = '"Sepal.Length"n > 6.8 and Species = "Iris-virginica"'
+  )
+```
+
+```{r}
+cas.simple.summary(
+  iristbl, 
+  casout = list(name = 'summout', caslib = 'casuser', promote = TRUE)
+  )
+
+```
+
+```{r}
+outtbl = defCasTable(conn, caslib = 'casuser', 'SUMMOUT')
+
+```
+
+```{r}
+cas.table.fetch(outtbl)
+
+```
+
+```{r}
+cas.table.dropTable(conn, name = "summout")
+
+```
+
+
+# Managing Parameters Using the Attribute Interface
+```{r}
+iristbl <- defCasTable(conn, 'data.iris', caslib = 'casuser')
+
+```
+
+```{r}
+dim(iristbl)
+
+```
+
+```{r}
+iristbl@where = '"Sepal.Length"n > 6.8 and Species = "Iris-virginica"'
+
+```
+
+```{r}
+dim(iristbl)
+
+```
+
+```{r}
+iristbl@groupby <- list("Species", "Sepal.Length")
+
+```
+
+```{r}
+iristbl@groupby[[1]] <- "Species"
+
+```
+
+```{r}
+iristbl@groupby[[2]] <- "Sepal.Length"
+
+```
+
+```{r}
+attributes(iristbl)
+
+```
+
+```{r}
+iristbl@groupby
+
+```
+
+```{r}
+iristbl@groupby <- list()
+
+```
+
+```{r}
+iristbl@where <- ''
+
+```
+
+```{r}
+attributes(iristbl)
+
+```
+
+```{r}
+iristbl@groupby <- c('Species', 'Sepal.Length')
+
+```
+
+```{r}
+iristbl@computedVars <- c('Length.Factor')
+
+```
+
+```{r}
+iristbl@computedVarsProgram <- 'Length.Factor = Sepal.Length * Petal.Length'
+
+```
+
+```{r}
+attributes(iristbl)
+
+```
+
+```{r}
+# Use the fetchvars= parameter to only fetch specified columns
+cas.table.fetch(iristbl, fetchvars = c('Sepal.Length', 'Petal.Length', 'Length.Factor'))
+
+```
+# Materializing CASTable Parameters
+```{r}
+iristbl <- defCasTable(
+  conn, 'data.iris', 
+  caslib = 'casuser',
+  where = '"Sepal.Length"n > 6.8 and Species = "Iris-virginica"'
+  )
+
+
+```
+
+```{r}
+sub_iris <- cas.table.partition(iristbl)
+
+```
+
+```{r}
+sub_iris
+
+```
+
+```{r}
+sub_iris <- defCasTable(conn, sub_iris$tableName)
+
+```
+
+```{r}
+cas.table.fetch(sub_iris)
+
+```
+
+```{r}
+cas.simple.numRows(sub_iris)
+
+```

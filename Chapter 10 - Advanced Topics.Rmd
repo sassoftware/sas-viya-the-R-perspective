@@ -1,0 +1,44 @@
+---
+title: "Chapter 10 - Advanced Topics"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+Import the SWAT package and get connected.
+
+```{r}
+library("swat")
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+```
+# The Binary Interface
+```{r eval = FALSE}
+binconn <- swat::CAS(cashost, casport, protocol='cas')
+```
+
+# The REST Interface
+```{r eval = FALSE}
+conn <- swat::CAS(cashost, casrestport, protocol='http')
+```
+
+# Connecting to Existing Sessions
+```{r}
+conn
+```
+```{r}
+currSession <- conn$session
+currSession
+```
+
+```{r}
+cas.session.listSessions(conn)
+```
+
+```{r}
+conn2 <- CAS(hostname = 'rdcgrd001.unx.sas.com', port = 39935,
+  session = currSession)
+
+```

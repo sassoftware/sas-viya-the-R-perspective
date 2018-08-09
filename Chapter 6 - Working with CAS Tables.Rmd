@@ -1,0 +1,351 @@
+---
+title: "Chapter 6 - Working with CAS Tables"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+
+
+Import the SWAT package and get connected.
+
+```{r}
+library("swat")
+library(dplyr)
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+cas.sessionProp.setSessOpt(conn, caslib = "casuser")
+```
+
+# Using CASTable Objects like a Data Frame
+
+## CAS Table Introspection
+check the class of iris data to make sure it is a data.frame instance
+```{r}
+class(iris)
+```
+
+Get the column names
+```{r}
+names(iris)
+```
+
+Load iris data.frame into a CAS table
+```{r}
+tbl <- as.casTable(conn, iris)
+```
+
+Show the class of tbl object
+```{r}
+class(tbl)
+names(tbl)
+```
+
+```{r}
+nrow(tbl)
+dim(tbl)
+```
+
+```{r}
+attributes(tbl)
+```
+
+```{r}
+head(tbl, n = 3L)
+```
+
+```{r}
+tail(tbl, n = 3L)
+```
+
+## Computing Simple Statistics
+Run the summary function on a data.frame
+```{r}
+summ <- summary(iris)
+summ
+```
+
+```{r}
+class(summ)
+```
+
+Run the summary function on a CASTable
+```{r}
+cassumm <- summary(tbl)
+cassumm
+```
+
+```{r}
+class(cassumm)
+```
+
+```{r }
+cas.sessionProp.setSessOpt(conn,caslib="HPS")
+out  <- cas.table.loadTable(conn, path = 'megacorp5m.sashdat',casOut=list(replace = TRUE) )
+cas.table.tableInfo(conn, 'MEGACORP5M')
+```
+
+```{r }
+mega = defCasTable(conn,'MEGACORP5M')
+system.time({ result = summary(mega) })
+```
+
+```{r }
+result
+```
+
+```{r}
+cas.sessionProp.setSessOpt(conn,caslib="casuser")
+cas.count(tbl)
+```
+
+```{r}
+cas.mean(tbl)
+```
+
+```{r}
+cas.var(tbl)
+```
+
+```{r}
+plot(tbl$Sepal.Length, tbl$Sepal.Width, pch = 16, type = 'p', 
+  col = 'blue', main = "Plot on a CASTable")
+
+```
+
+```{r}
+par(mfrow=c(1,3))
+
+tbl_tmp <- tbl[tbl$Species == 'setosa',]
+plot(tbl_tmp$Sepal.Length, tbl_tmp$Sepal.Width, pch = 16, type = 'p', 
+    col = 'red', main = "setosa")
+
+tbl_tmp <- tbl[tbl$Species == 'versicolor',]
+plot(tbl_tmp$Sepal.Length, tbl_tmp$Sepal.Width, pch = 17, type = 'p', 
+    col = 'green', main = "versicolor")
+
+tbl_tmp <- tbl[tbl$Species == 'virginica',]
+plot(tbl_tmp$Sepal.Length, tbl_tmp$Sepal.Width, pch = 18, type = 'p', 
+    col = 'blue', main = "virginica")
+
+```
+
+# Sorting, Data Selection, and Iteration
+## Fetching Data with a Sort Order
+```{r}
+sorttbl <- defCasTable(conn, 'iris', orderby = 'Sepal.Length')
+```
+
+```{r}
+sorttbl <- defCasTable(conn, 'iris')
+sorttbl@orderby <- 'Sepal.Length'
+
+```
+
+```{r}
+head(sorttbl, n = 10L)
+```
+
+```{r}
+tail(sorttbl, n = 10L)
+```
+## Iterating through Columns
+```{r}
+for (col in names(sorttbl)){
+  print(col)
+}
+
+```
+## Techniques for Indexing and Selecting Data
+### Selecting Columns by Label and Position
+```{r}
+sorttbl@orderby <- 'Sepal.Width'
+col <- sorttbl['Sepal.Width']
+head(col)
+
+```
+
+```{r}
+col <- sorttbl$Sepal.Width
+head(col)
+
+```
+
+```{r}
+widths <- sorttbl[c('Sepal.Width', 'Petal.Width', 'Species')]
+class(widths)
+
+```
+
+```{r}
+head(widths)
+```
+
+```{r}
+summary(widths)
+```
+
+```{r}
+cas.table.columnInfo(widths)
+```
+
+```{r}
+sorttbl@orderby <- 'Sepal.Width'
+```
+Select the petal_width column
+```{r}
+head(sorttbl[,"Petal.Width"])
+
+```
+
+Select a list of columns
+```{r}
+
+head(sorttbl[,c("Petal.Width","Sepal.Length")])
+
+```
+
+```{r}
+head(sorttbl[,3])
+```
+
+```{r}
+head(sorttbl[,1:3])
+```
+
+```{r}
+head(sorttbl[,c(4,2)])
+```
+### Dynamic Data Selection
+```{r}
+expr <- sorttbl$Petal.Length > 6.5
+```
+
+```{r}
+newtbl <- sorttbl[expr,]
+head(newtbl)
+
+```
+
+```{r}
+newtbl <- sorttbl[sorttbl$Petal.Length > 6.5,]
+head(newtbl)
+
+```
+
+```{r}
+newtbl2 <- newtbl[newtbl$Petal.Width < 2.2,]
+head(newtbl2)
+
+```
+
+```{r}
+newtbl3 <- sorttbl[(sorttbl$Petal.Length > 6.5) & (sorttbl$Petal.Width < 2.2),]
+head(newtbl3)
+
+```
+
+```{r}
+attributes(newtbl3)
+```
+
+```{r}
+tbl[(tbl$Petal.Length + tbl$Petal.Width) * 2 > 17.5,]
+```
+
+```{r}
+tbl <- defCasTable(conn, 'iris')
+virginica <- tbl[tbl$Species == 'virginica',]
+dim(virginica)
+
+```
+
+```{r}
+head(virginica)
+```
+# Data Wrangling on the Fly
+
+## Creating Computed Columns
+```{r}
+sorttbl['Sepal.Factor'] <- (sorttbl$Sepal.Length+sorttbl$Sepal.Width)*2
+head(sorttbl)
+
+```
+
+```{r}
+sorttbl['Total.Factor'] <- sorttbl$Sepal.Factor + sorttbl$Petal.Width + sorttbl$Petal.Length
+head(sorttbl)
+
+```
+
+```{r}
+sorttbl['names'] <- 'sepal / petal'
+head(sorttbl)
+
+```
+
+```{r}
+tbl = defCasTable(conn, 'iris')
+tbl$is.virginica  <- (tbl$Species == 'virginica')
+head(tbl) 
+
+```
+## BY-Group Processing
+```{r}
+tbl = defCasTable(conn, 'iris')
+```
+
+```{r}
+grptbl <- tbl
+grptbl@groupby <- 'Species'
+attributes(grptbl)
+
+```
+
+```{r}
+cas.simple.summary(grptbl, subset = c("min","max"))
+```
+
+```{r}
+cas.simple.summary(
+  conn, 
+  table = list(name = 'iris', groupby = 'Species'),
+  subset = c("min","max"))
+
+```
+
+### Concatenating BY Groups
+```{r}
+grpsumm <- cas.simple.summary(grptbl, subset = c("min","max"))
+```
+
+```{r}
+rbind.bygroups(grpsumm)
+```
+
+Selecting Result Keys by Table Name
+```{r}
+grpcorr <- cas.simple.correlation(grptbl)
+grpcorr
+
+```
+
+```{r}
+result <- rbind.bygroups(grpcorr)
+result$Correlation
+
+```
+### Handling Multiple Sets of BY Groups
+```{r}
+grpmdsumm <- cas.simple.mdSummary(
+  tbl, 
+  sets=list(
+    list(groupby='Sepal.Length'),
+    list(groupby='Petal.Length')
+    )
+  )
+names(grpmdsumm)
+
+```

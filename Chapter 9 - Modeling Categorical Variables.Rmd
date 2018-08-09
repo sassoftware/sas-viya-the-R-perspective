@@ -1,0 +1,335 @@
+---
+title: "Chapter 9 - Modeling Categorical Variables "
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+Import the SWAT package and get connected.
+
+```{r}
+library("swat")
+library(dplyr)
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+```
+
+Load data
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = "HPS")
+out <- cas.table.loadTable(
+  conn, 
+  path = 'organics_new_vistat.sashdat',
+  casOut = list(name = "organics", replace = TRUE))
+
+organics <- defCasTable(conn,'organics')
+```
+
+```{r}
+cas.table.tableInfo(conn)
+```
+# Logistic Regression
+```{r}
+loadActionSet(conn, 'regression')
+```
+
+```{r}
+cas.regression.logistic(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemAge', 'Purchase_3mon', 'Purchase_6mon')
+)
+
+```
+
+```{r}
+cas.regression.logistic(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemAge', 'Purchase_3mon', 'Purchase_6mon', 
+             'DemGender','DemHomeowner'),
+  nominals = c('DemGender', 'DemHomeowner'),
+  display = list(names = 'ParameterEstimates')
+)
+
+```
+
+```{r}
+cas.regression.logistic(
+  organics,
+  model = list(
+    depvars = list(list(name = 'TargetBuy')),
+    effects = list(list(
+      vars = list('DemAge', 'Purchase_3mon', 'Purchase_6mon', 
+                  'DemGender','DemHomeowner'))),
+    link = 'PROBIT'
+    ),
+  class = list(list(vars = list('DemGender', 'DemHomeowner'))),
+  display = list(names = list('ResponseProfile',
+                                   'ParameterEstimates'))
+)
+
+```
+
+```{r}
+cas.regression.logistic(
+  organics,
+  model = list(
+    depvars = list(list(name = 'TargetBuy')),
+    effects = list(list(
+      vars = list('DemAge', 'Purchase_3mon', 'Purchase_6mon', 
+                  'DemGender','DemHomeowner'))),
+    link = 'PROBIT'),
+  class = list(list(vars = list('DemGender', 'DemHomeowner'))),
+  output = list(casout  = list(name = 'predicted',
+                               replace = TRUE),
+                copyVars= 'ALL')
+)
+result1 = defCasTable(conn, 'predicted')
+
+```
+
+```{r}
+names(result1)
+```
+
+```{r}
+cas.simple.crossTab(result1, row='DemGender', weight='_PRED_', aggregators='mean')
+```
+
+```{r}
+# example 4 score code
+result <- cas.regression.logistic(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemAge', 'Purchase_3mon', 'Purchase_6mon'),
+  code = list(tabForm = FALSE)
+)
+result$`_code_`
+
+```
+
+```{r}
+organics@groupby <- 'DemGender'
+result <- cas.regression.logistic(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemAge', 'Purchase_3mon', 'Purchase_6mon')
+)
+
+```
+
+```{r}
+result2 <- rbind.bygroups(result)
+result2$ParameterEstimates
+organics@groupby <- list()
+
+```
+# Decision Trees
+```{r}
+cas.builtins.loadActionSet(conn, 'decisiontree')
+```
+
+```{r}
+cas.decisionTree.dtreeTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemGender'),
+  casout = list(name = 'treeModel1', replace = TRUE)
+)
+output1 <- defCasTable(conn, 'treeModel1')
+```
+
+```{r}
+names(output1)
+```
+
+```{r}
+output1[,c('_TreeLevel_', '_NodeID_', '_Parent_', '_ParentName_', 
+        '_NodeType_', '_PBName0_', 
+        '_PBName1_')]
+
+```
+
+```{r}
+output1[,c('_TreeLevel_', '_NodeID_', '_Parent_', 
+           '_TargetVal0_', '_TargetVal1_', '_CI0_', '_CI1_', 
+           '_Gain_', '_NumObs_')]
+
+```
+
+```{r}
+cas.decisionTree.dtreeTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemGender'),
+  casout = list(name = 'treeModel1', replace = TRUE),
+  prune = TRUE
+)
+
+```
+
+```{r}
+output1 <- defCasTable(conn, 'treeModel1')
+output1[,c('_TreeLevel_', '_NodeID_', '_Parent_', '_ParentName_', 
+           '_NodeType_', '_PBName0_',
+           '_PBName1_')]
+
+```
+
+```{r eval = FALSE}
+cas.decisiontree.dtreePrune(
+  conn, 
+  table = 'your_validation_data',
+  modelTable = 'treeModel1',
+  casout = list(name = 'pruned_tree')
+)
+
+```
+
+```{r}
+varlist <- c('DemGender', 'DemHomeowner', 'DemAgeGroup', 'DemCluster', 
+             'DemReg', 'DemTVReg', 'DemFlag1', 'DemFlag2', 'DemFlag3', 
+             'DemFlag4', 'DemFlag5', 'DemFlag6', 'DemFlag7', 'DemFlag8', 
+             'PromClass')
+cas.decisionTree.dtreeTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = varlist,
+  casout = list(name = 'treeModel2', replace = TRUE)
+)
+
+```
+
+```{r}
+cas.decisionTree.dtreeTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = varlist,
+  leafSize = 1000,
+  maxLevel = 4,
+  casout = list(name = 'treeModel2', replace = TRUE)
+)
+
+```
+
+```{r}
+cas.decisionTree.dtreeScore(
+  organics,
+  modelTable = 'treeModel2'
+)
+
+```
+
+```{r}
+result <- cas.decisionTree.dtreeScore(
+  organics,
+  modelTable = 'treeModel2',
+  casout = list(name = 'predicted', replace = TRUE)
+)
+output3 <- defCasTable(conn, 'predicted')
+names(output3)
+
+```
+
+```{r}
+head(output3, n = 10L)
+```
+# Gradient Boosting, Random Forests, and Neural Networks
+```{r}
+cas.builtins.loadActionSet(conn, 'decisiontree')
+```
+## Random Forests
+```{r}
+varlist <- c('DemGender', 'DemHomeowner', 'DemAgeGroup',
+             'DemCluster', 'DemReg', 'DemTVReg', 'DemFlag1', 
+             'DemFlag2', 'DemFlag3', 'DemFlag4', 'DemFlag5', 
+             'DemFlag6', 'DemFlag7', 'DemFlag8', 'PromClass')
+cas.decisionTree.forestTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = varlist,
+  casout = list(name = 'forest1', replace = TRUE)
+)
+
+```
+
+```{r}
+result <- cas.decisionTree.forestTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = varlist,
+  varimp = TRUE,
+  casout = list(name = 'forest1', replace = TRUE)
+)
+result['DTreeVarImpInfo']
+
+```
+
+```{r}
+result['OutputCasTables']
+```
+
+```{r eval = FALSE}
+cas.decisionTree.forestScore(
+  organics,
+  modelTable = 'forest1',
+  casout = list(name = 'scored_output', replace = TRUE)
+)
+
+```
+## Gradient Boosting
+```{r}
+varlist <- c('DemGender', 'DemHomeowner', 'DemAgeGroup', 'DemCluster', 
+             'DemReg', 'DemTVReg', 'DemFlag1', 'DemFlag2', 'DemFlag3', 
+             'DemFlag4', 'DemFlag5', 'DemFlag6', 'DemFlag7', 'DemFlag8', 
+             'PromClass')
+cas.decisionTree.gbtreeTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = varlist,
+  casout = list(name = 'gbtree1', replace = TRUE)
+)
+
+```
+
+```{r eval = FALSE}
+cas.decisionTree.gbtreeScore(
+  organics,
+  modelTable = 'gbtree1',
+ casout = list(name = 'scored_output', replace = TRUE)
+)
+
+```
+## Neural Networks
+```{r}
+cas.builtins.loadActionSet(conn, 'neuralNet')
+```
+
+```{r}
+result <- cas.neuralNet.annTrain(
+  organics,
+  target = 'TargetBuy',
+  inputs = c('DemAge','DemAffl','DemGender'),
+  casout = list(name = 'ann1', replace = TRUE),
+  hiddens = c(4,2),
+  maxIter = 500
+)
+names(result)
+
+```
+
+```{r}
+result['ModelInfo']
+```
+
+```{r}
+cas.neuralNet.annScore(
+  organics,
+  modelTable = 'ann1',
+  casout = list(name = 'scored_output', replace = TRUE)
+)
+
+```

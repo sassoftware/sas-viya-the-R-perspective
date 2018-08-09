@@ -1,0 +1,586 @@
+---
+title: "Chapter 7 - Data Exploration and Summary Statistics"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+
+
+Import the SWAT package and get connected.
+
+```{r}
+library("swat")
+library(dplyr)
+conn <- CAS('rdcgrdc.unx.sas.com', 39935)
+
+```
+
+# Overview
+```{r}
+cas.sessionProp.setSessOpt(conn, caslib = "HPS")
+out <- cas.table.loadTable(
+  conn, 
+  path = 'organics_new_vistat.sashdat',
+  casOut = list(name = "organics", replace = TRUE))
+
+organics <- defCasTable(conn,'organics')
+
+```
+
+# Summarizing Continuous Variables
+## Descriptive Statistics
+```{r}
+cas.simple.summary(organics)
+```
+
+```{r}
+varlist <- c('DemAge', 'Purchase_12mon', 'Purchase_6mon')
+cas.simple.summary(organics, inputs = varlist)
+
+```
+
+```{r}
+varlist <- c('Purchase_3mon', 'Purchase_6mon', 'Purchase_9mon',  
+            'Purchase_12mon')
+result <- cas.simple.summary(organics, inputs = varlist)
+
+```
+
+```{r}
+names(result)
+```
+
+```{r}
+df <- result$Summary
+names(df)
+
+```
+
+```{r}
+df1 <- df[c('Column','Min','Mean','Max')]
+t(df1)
+
+```
+
+```{r}
+barplot(df$Mean, names.arg = df$Column, col = '#1f77b4')
+```
+
+```{r}
+organics@groupby <- 'DemGender'
+result <- cas.simple.summary(organics, inputs = 'DemAge')
+result
+```
+
+```{r}
+result <- cas.simple.summary(
+  conn, 
+  table = list(name = 'organics', groupby = 'DemGender'),
+  inputs = 'DemAge')
+
+```
+
+```{r}
+names(result)
+```
+
+```{r}
+result['ByGroupInfo']
+```
+
+```{r}
+result2 <- rbind.bygroups(result)
+result2["Summary"]
+
+```
+
+```{r}
+result <- cas.simple.summary(
+  conn, 
+  table = list(name = 'organics',
+               groupby = c('DemGender','DemHomeowner')),
+  inputs = 'DemAge')
+
+names(result)
+
+```
+
+```{r}
+result$ByGroupInfo
+```
+
+```{r}
+result2 <- rbind.bygroups(result)
+result2
+
+```
+
+```{r}
+organics@groupby <- list()
+result <- cas.simple.summary(organics, inputs = 'DemAge')
+result
+
+```
+
+## Histograms
+```{r}
+loadActionSet(conn, 'dataPreprocess')
+```
+
+```{r}
+result <- cas.dataPreprocess.histogram(
+  organics, 
+  reqpacks = list(list(nicebinning = FALSE, nbins = 10)),
+  inputs = c('Purchase_3mon')
+  )
+result['BinDetails']
+
+```
+
+```{r}
+df = result$BinDetails
+barplot(df$Percent, names.arg = df$MidPoint, cex.names = 0.5, 
+  xlab='Purchase_3mon', ylab='Percent', col = '#1f77b4')
+
+```
+
+```{r}
+result <- cas.dataPreprocess.histogram(
+  organics, 
+  reqpacks = list(list(nicebinning = TRUE, nbins = 10)),
+  inputs = c('Purchase_3mon')
+  )
+df = result$BinDetails
+barplot(df$Percent, names.arg = df$MidPoint, cex.names = 0.5,
+        xlab='Purchase_3mon', ylab='Percent', col = '#1f77b4')
+
+```
+
+```{r}
+result <- cas.dataPreprocess.histogram(
+  organics, 
+  reqpacks = list(list(nicebinning = TRUE, nbins = 25)),
+  inputs = c('Purchase_3mon')
+  )
+df = result$BinDetails
+barplot(df$Percent, names.arg = df$MidPoint, cex.names = 0.5,
+        xlab='Purchase_3mon', ylab='Percent', col = '#1f77b4') 
+
+```
+
+```{r}
+result <- cas.dataPreprocess.histogram(
+  organics, 
+  reqpacks = list(list(binwidth = 50)),
+  inputs = c('Purchase_3mon')
+  )
+df = result$BinDetails
+barplot(df$Percent, names.arg = df$MidPoint, cex.names = 0.5,
+        xlab='Purchase_3mon', ylab='Percent', col = '#1f77b4')
+
+```
+
+```{r}
+organics@groupby <- c('DemGender', 'DemAgeGroup')
+result <- cas.dataPreprocess.histogram(
+  organics, 
+  reqpacks = list(list(nicebinning = TRUE, nbins = 20)),
+  inputs = c('DemAffl')
+  )
+names(result)
+
+```
+
+```{r}
+result['ByGroupInfo']
+```
+
+```{r}
+all_df = list()
+all_df[['Gender=Female, AgeGroup=Middle']]  = result$ByGroup1.BinDetails
+all_df[['Gender=Female, AgeGroup=Senior']]  = result$ByGroup1.BinDetails
+all_df[['Gender=Female, AgeGroup=Unknown']] = result$ByGroup1.BinDetails
+all_df[['Gender=Female, AgeGroup=Young']]   = result$ByGroup1.BinDetails
+
+par(mfrow=c(2,2))
+for (this_title in names(all_df)){
+  barplot(all_df[[this_title]]$Percent, 
+          names.arg = all_df[[this_title]]$MidPoint, 
+          xlab='DemAffl', ylab='Percent', col = '#1f77b4',
+          main = this_title)
+  }
+
+```
+
+## Percentiles
+```{r}
+cas.builtins.loadActionSet(conn, 'percentile')
+```
+
+```{r}
+organics@groupby <- list()
+cas.percentile.percentile(organics, inputs = 'DemAge')
+
+```
+
+```{r}
+result <- cas.percentile.percentile(
+  organics, 
+  inputs = 'DemAge', 
+  values = seq(5,90,5)
+  )
+result
+
+```
+
+```{r}
+organics@groupby <- 'DemGender'
+result <- cas.percentile.percentile(
+  organics, 
+  inputs = 'DemAge', 
+  values = seq(5,90,5))
+result2 <- rbind.bygroups(result)$Percentile
+```
+
+```{r}
+library('ggplot2')
+ggplot(result2, aes(Pctl, Value, shape = factor(DemGender))) +
+  geom_point(aes(colour = factor(DemGender)))
+ 
+```
+## Correlations
+```{r}
+cas.simple.correlation(organics)
+```
+
+```{r}
+varlist <- c('DemAffl', 'DemAge', 'purchase_3mon')
+cas.simple.correlation(organics,inputs=varlist, simple=FALSE)
+
+```
+
+# Summarizing Categorical Variables
+## Distinct Counts
+```{r}
+organics <- defCasTable(conn,'organics')
+cas.simple.distinct(organics)
+
+```
+
+```{r}
+cas.simple.distinct(organics, maxnvals=500)
+```
+
+```{r}
+cas.simple.distinct(
+  organics, 
+  maxnvals=500, 
+  casout = list(name = 'distinctOutput'))
+
+```
+
+```{r}
+result <- defCasTable(conn, 'distinctOutput')
+head(result)
+
+```
+
+```{r}
+out1 <- cas.table.columnInfo(organics)$ColumnInfo
+out2 <- cas.simple.distinct(organics,maxnvals=1000)$Distinct
+out3 <- cbind(out1, out2)
+
+varname <- out3$Column
+vartype <- out3$Type
+varNDistinct <- out3$NDistinct
+catList <- c()
+contList <- c()
+otherList <- c()
+
+for (i in 1:length(varname)){
+  if (vartype[i] == 'char' & varNDistinct[i] <= 128)
+    catList <- c(catList, varname[i])
+  else if (vartype[i] == 'double' & varNDistinct[i] <= 16)
+    catList <- c(catList, varname[i])
+  else if (vartype[i] == 'double' & varNDistinct[i] > 16)
+    contList <- c(contList, varname[i])
+  else
+    otherList <- c(otherList, varname[i])
+}
+
+varlist <- list(cats = catList,conts = contList, others = otherList)
+varlist
+
+```
+
+## Frequency
+```{r}
+cas.simple.freq(organics, inputs = "TargetBuy")
+```
+
+```{r}
+cas.simple.freq(organics["TargetBuy"])
+```
+
+```{r}
+out <- cas.simple.freq(organics['TargetBuy'])
+df <- out$Frequency
+barplot(df$Frequency, names.arg = df$FmtVar, 
+        xlab='TargetBuy', ylab='Frequency', col = '#1f77b4')
+
+```
+
+```{r}
+cas.simple.freq(organics['TargetBuy','DemAgeGroup','DemHomeowner'])
+```
+
+```{r}
+out <- cas.simple.freq(organics['DemAge'], includemissing = FALSE)
+df <- out$Frequency
+barplot(df$Frequency, names.arg = df$NumVar, 
+        xlab='Age', ylab='Frequency', col = '#1f77b4')
+
+```
+
+```{r}
+out <- cas.simple.freq(organics['DemAge'], includemissing = TRUE)
+df <- out$Frequency
+barplot(df$Frequency, names.arg = df$NumVar, 
+        xlab='Age', ylab='Frequency', col = '#1f77b4')
+
+```
+
+## Top K
+```{r}
+cas.simple.topK(organics['purchase_12mon'], topk=5, bottomk=0)
+```
+
+```{r}
+result <- cas.simple.topK(organics['purchase_12mon'], topk=5, bottomk=0)
+for (df in names(result)){
+  dfnames <- paste(names(result[[df]]),collapse=' ')
+  print(paste(df, ' table has: ', dfnames))
+}
+
+```
+
+```{r}
+cas.simple.topK(organics[c('purchase_12mon','DemAge')], topk=5, bottomk=5)
+```
+
+```{r}
+cas.simple.topK(organics, inputs = 'DemTVReg', 
+                topk=3, bottomk=3, 
+                weight='DemAffl', agg='mean')
+
+```
+
+```{r}
+cas.simple.topK(organics, inputs = 'DemTVReg', 
+                topk=3, bottomk=3, 
+                weight='purchase_3mon', agg='sum')
+
+```
+## Cross Tabulations
+```{r}
+result <- cas.simple.crossTab(organics, row='DemAgeGroup', col='DemGender')
+result
+
+```
+
+```{r}
+result$Crosstab@names
+```
+
+```{r}
+result$Crosstab@col.labels
+```
+
+```{r}
+df <- result$Crosstab@df
+names(df)[-1] <- result$Crosstab@col.labels[-1]
+df
+
+```
+
+```{r}
+cas.simple.crossTab(organics, row='DemAgeGroup', col='DemGender',
+                    association=TRUE, chisq=TRUE)
+
+```
+
+```{r}
+result <- cas.simple.crossTab(organics, 
+                              row='DemAgeGroup', 
+                              col='DemGender')
+df <- result$Crosstab@df
+
+# use the reshape2 package to transform data from wide format
+# to long format
+library(reshape2) 
+names(df)[-1] <- result$Crosstab@col.labels[-1]
+df_melt <- melt(df, id.vars = c('DemAgeGroup'))
+names(df_melt)[-1] = c('DemGender', 'Frequency')
+
+library(ggplot2)
+ggplot(df_melt, aes(DemGender, Frequency, fill = DemAgeGroup)) + 
+  geom_bar(position = 'dodge', stat='identity') + 
+  theme(legend.direction = 'vertical') +
+  scale_fill_brewer(palette = 'Set1')
+
+```
+
+```{r}
+organics <- defCasTable(conn,'organics')
+result <- cas.simple.crossTab(
+  organics, row='DemAgeGroup', col='DemGender',
+  weight='purchase_3mon', aggregators='sum')
+df <- result$Crosstab@df
+names(df)[-1] <- result$Crosstab@col.labels[-1]
+df
+
+```
+
+```{r}
+result <- cas.simple.crossTab(
+  organics, row='DemAgeGroup', col='purchase_3mon', 
+  colnbins=4, chisq=TRUE)
+df <- result$Crosstab@df
+names(df)[-1] <- result$Crosstab@col.labels[-1]
+df
+
+```
+
+```{r}
+result[['ChiSq']]
+```
+
+```{r}
+organics@groupby = 'DemReg'
+result <- cas.simple.crossTab(
+  organics, row='DemAgeGroup', col='DemGender', chisq=TRUE)
+for (table_name in names(result)){
+  df <- result[[table_name]]
+  if (grepl('ChiSq',table_name)) 
+    print(df[df$Statistic == 'Chi-Square',])
+}
+organics@groupby = list()
+```
+
+# Variable Transformation and Dimension Reduction
+```{r}
+cas.builtins.loadActionSet(conn, 'dataPreprocess')
+```
+## Variable Binning
+```{r}
+result <- cas.dataPreprocess.binning(
+  organics, inputs = 'purchase_3mon', tech='bucket',
+  casout = list(name = 'binnedData', replace = TRUE),
+  nBinsArray = 10)
+out_data <- defCasTable(conn, 'binnedData')
+head(out_data, n = 10L)
+
+```
+
+```{r}
+result
+```
+
+```{r}
+result <- cas.dataPreprocess.binning(
+  organics, 
+  inputs = c('purchase_3mon', 'purchase_6mon', 
+             'purchase_9mon', 'purchase_12mon'),
+  tech='bucket',
+  casout = list(name = 'binnedData', replace = TRUE),
+  nBinsArray = c(4, 10, 20, 6))
+out_data <- defCasTable(conn, 'binnedData')
+head(out_data, n = 10L)
+
+```
+
+```{r}
+result <- cas.dataPreprocess.binning(
+  organics, 
+  inputs = c('purchase_3mon', 'purchase_6mon', 
+             'purchase_9mon', 'purchase_12mon'),
+  tech= 'Quantile',
+  casout = list(name = 'binnedData2', replace = TRUE),
+  copyallvars = TRUE,
+  nBinsArray = c(4, 4, 4, 4))
+out_data2 <- defCasTable(conn, 'binnedData2')
+names(out_data2)
+
+```
+
+```{r}
+cas.simple.crossTab(out_data2, row='bin_purchase_3mon', col='bin_purchase_12mon')
+```
+
+```{r}
+result <- cas.dataPreprocess.binning(
+  organics, 
+  inputs = 'purchase_3mon',
+  tech = 'bucket',
+  casout = list(name = 'binnedData2', replace = TRUE),
+  code = list(comment = TRUE, tabform = TRUE),
+  nBinsArray = 10)
+names(result)
+
+```
+
+```{r}
+# score code is saved in this table
+# df = result['CodeGen']
+df = result$CodeGen 
+
+```
+
+## Variable Imputation
+```{r}
+df <- cas.simple.distinct(organics)$Distinct
+df[df$NMiss > 0,]
+
+```
+
+```{r}
+cas.dataPreprocess.impute(organics, inputs = 'PromTime')
+```
+
+```{r}
+cas.dataPreprocess.impute(
+  organics, 
+  methodcontinuous = 'Median',
+  copyallvars = TRUE,
+  casout = list(name = 'cas.imputedData1', replace=TRUE),
+  inputs = 'PromTime')
+
+```
+
+```{r}
+cas.dataPreprocess.impute(
+  organics, 
+  methodcontinuous = 'Value',
+  valuescontinuous = 0,
+  copyallvars = TRUE,
+  casout = list(name = 'cas.imputedData1', replace=TRUE),
+  inputs = 'PromTime')
+
+```
+
+```{r}
+result <- cas.dataPreprocess.impute(
+  organics, 
+  methodcontinuous = 'Value',
+  valuescontinuous = 0,
+  copyallvars = TRUE,
+  casout = list(name = 'cas.imputedData1', replace=TRUE),
+  code = list(comment = TRUE, tabform = TRUE),
+  inputs = 'PromTime') 
+result$CodeGen
+
+```

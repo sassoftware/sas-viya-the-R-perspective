@@ -1,0 +1,292 @@
+---
+title: "Chapter 3 - The Fundamentals of R with Viya"
+author: "Yue Qi"
+output: github_document
+---
+
+```{r setup}
+knitr::opts_chunk$set()
+```
+
+## Connecting to CAS
+
+Import the SWAT package.
+
+
+```{r}
+library("swat")
+
+```
+
+Create a connection.
+```{r}
+conn <- CAS('rdcgrdc.unx.sas.com', 25970)
+
+```
+
+## Running CAS Actions 
+Run the help action.
+```{r}
+out <- cas.builtins.help(conn)
+```
+
+The following code displays the help content for the builtins action set.
+```{r}
+out <- cas.builtins.help(conn, actionset = 'builtins')
+```
+
+Display the Help for the help action.
+```{r}
+out <- cas.builtins.help(conn, action = 'help')
+```
+
+Suppress the parameter descriptions by specifying verbose=False.
+```{r}
+out <- cas.builtins.help(conn, action = 'help', verbose = FALSE)
+```
+
+Let's see what the R help function displays.
+```{r}
+help(as.casTable)
+```
+
+You can also use a question mark followed by the function name.
+
+```{r}
+?as.casTable
+```
+
+You can also use tab-completion on action sets in RStudio or other IDEs that support it.
+
+```{r, eval = FALSE}
+cas.builtins.<tab>
+```
+
+### Specifying Action Parameters
+
+Using the echo action to practice more complex parameter types.
+
+```{r}
+out <- cas.builtins.help(conn, action = 'help')
+```
+
+Using nested structures in parameters.
+
+```{r}
+out <- cas.builtins.echo(
+  conn,
+  boolean_true = TRUE,
+  boolean_false = FALSE,
+  double = 3.14159,
+  int32 = 1776,
+  int64 = 2**60,
+  string = 'I like snowmen! \u2603',
+  vector = c('item1', 'item2', 'item3'),
+  list = list(key1 = 'value1',
+              key2 = 'value2',
+              key3 = 3)
+  )
+
+```
+
+Using nested structures in parameters.
+
+```{r}
+out <- cas.builtins.echo(
+  conn,
+  list = list(
+    'item1', 
+    'item2',
+    list(
+      key1 = 'value1',
+      key2 = list(
+        value2 = c(0, 1, 1, 2, 3)
+        )
+      )
+    ))
+
+```
+
+
+#### Automatic Type Casting
+
+The CAS server will attempt to cast values to the appropriate type. Here we are getting the history from the server using integers.
+
+```{r}
+# Using integers
+out <- cas.builtins.history(conn, first = 5, last = 7)
+
+```
+
+Here we are using strings, which get converted to integers on the server side.
+  
+```{r}
+# Using strings as integer values
+out <- cas.builtins.history(conn, first = '5', last = '7')
+
+```
+
+#### Scalar Parameter to List Conversion
+
+Many times when using an action parameter that requires a list as an argument, you use only the first key in the list to specify the parameter. For example, the builtins.help action takes a parameter called casout. This parameter specifies an output table to put the history information into.
+
+```{r}
+out <- cas.builtins.help(conn, action = 'history')
+```
+
+The first key in the casout parameter is name and indicates the name of the CAS table to create. The complete way of specifying this parameter with only the name key follows:
+
+```{r}
+out <- cas.builtins.history(conn, casout = list(name='hist'))
+```
+
+This is such a common idiom that the server enables you to specify list values with only the first specified key given (for example, name), just using the value of that key. That is a mouthful, but it is easier than it sounds. It just means that rather than having to use the list to create a nested list, you could simply do the following:
+
+```{r}
+out <- cas.builtins.history(conn, casout = list(name = 'hist', replace = TRUE))
+
+```
+
+Of course, if you need to use any other keys in the casout parameter, you must use the list form. This conversion of a scalar value to a list value is common when specifying input tables and variable lists of tables, which we see later on.
+
+### CAS Action Results
+
+Up to now, all of our examples have stored the result of the action calls in a variable, but we have not done anything with the results yet. Let's start by using our example of all of the CAS parameter types.
+
+```{r}
+out <- cas.builtins.echo(
+  conn,
+  boolean_true = TRUE,
+  boolean_false = FALSE,
+  double = 3.14159,
+  int32 = 1776,
+  int64 = 2**60,
+  string = 'I like snowmen! \u2603',
+  vector = c('item1', 'item2', 'item3'),
+  list = list(key1 = 'value1',
+              key2 = 'value2',
+              key3 = 3)
+)
+
+```
+
+Displaying the contents of the out variable gives:
+```{r}
+out
+```
+```{r}
+class(out)
+```
+
+The object that is held in the out variable a list object. You can traverse and modify the result just as you could any other R list object. For example, if you wanted to walk through the items and print each key and value explicitly, you could do the following:
+```{r}
+for (key in names(out)){
+  print(key)
+  print(out[[key]])
+  cat('\n')
+}
+```
+
+#### Using  casDataFrames
+
+The following code runs the builtins.help action, lists the names in the list object that is returned, verifies that it is a casDataFrame object using R's class function, and displays the contents of the casDataFrame (some output is reformatted slightly for readability):
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+out <- cas.builtins.help(conn)
+```
+
+```{r}
+names(out)
+```
+
+```{r}
+class(out[['builtins']])
+```
+
+```{r}
+out[['builtins']]
+```
+
+We can store this casDataFrame in another variable to make it a bit easier to work with. Because the returned results are list objects, you can access keys as attributes. This means that we can access the builtins key of the out variable in either of the following ways:
+
+```{r}
+blt <- out[['builtins']]
+
+```
+
+```{r}
+blt <- out$builtins 
+```
+
+Now that we have a handle on the casDataFrame, we can do typical data.frame operations on it such as sorting and filtering. For example, to sort the builtins actions by the name column, you might do the following.
+```{r}
+blt[order(blt$name),]
+```
+
+### Working with CAS Action Sets
+
+See what action sets are available on our server. Depending on your installation and licensing, the list varies from system to system.
+```{r}
+# Run the builtins.actionsetinfo action.
+asinfo <- cas.builtins.actionSetInfo(conn, all = TRUE)
+
+# Filter the casDataFrame to contain only action sets that
+# have not been loaded yet.
+asinfoNotLoaded <- asinfo$setinfo[asinfo$setinfo$loaded == 0, ]
+
+# Create a new casDataFrame with only columns between 
+# actionset and label.
+asinfoNotLoaded <- asinfoNotLoaded[,c('actionset','label')]
+
+asinfoNotLoaded
+```
+
+Load the **simple** action set.
+```{r}
+cas.builtins.loadActionSet(conn, 'simple')
+```
+
+Get help on the simple action set using the usual builtins. Or refer to the documents on SAS Help Center. For example, here is the link to [the help of SAS Viya version 3.3](http://go.documentation.sas.com/?cdcId=pgmsascdc&cdcVersion=9.4_3.3&docsetId=allprodsactions&docsetTarget=actionsByName.htm&locale=en).
+
+```{r}
+out <- cas.builtins.help(conn, actionset = 'simple')
+```
+
+## Details
+
+### CAS Session Options
+
+out <- cas.sessionProp.getSessOpt(conn, name = 'metrics')
+```{r}
+out <- cas.sessionProp.getSessOpt(conn, name = 'metrics')
+out
+```
+
+Get the actual value of the metrics option by accessing that key of the list object.
+```{r}
+out$metrics
+```
+
+Setting the values of options using sessionProp.setSessOpt with keyword arguments for the option names.
+
+```{r}
+cas.sessionProp.setSessOpt(conn, metrics = TRUE, collate = 'MVA')
+```
+
+Notice that the metrics option takes effect immediately. We now get performance metrics of the action that is printed to the output. Checking the value of collate, you see that it has been set to MVA.
+
+```{r}
+out <- cas.sessionProp.getSessOpt(conn, name = 'collate')
+```
+
+
+```{r}
+out$collate
+```
+
+
+
+
+
+
+
+
