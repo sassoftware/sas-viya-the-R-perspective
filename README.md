@@ -1,6 +1,6 @@
 <img src='cover.jpg' align='right' />
 
-# SAS Viya: The Python Perspective
+# SAS Viya: The R Perspective
 
 Yue Qi, Kevin D Smith & Xiangxiang Meng
 
